@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Tokoku</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.login-box{max-width:340px;margin:80px auto;background:#fff;padding:28px;border-radius:var(--radius);box-shadow:var(--shadow);text-align:center}
+.tabs{display:flex;background:#fff;border-radius:14px;overflow:hidden;margin:16px;box-shadow:var(--shadow)}
+.tab{flex:1;padding:14px;text-align:center;font-weight:700;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--primary);color:#fff}
+.admin-main{max-width:560px;margin:0 auto;padding:0 16px}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#fff;border-radius:14px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+.stat b{font-size:1.2rem;color:var(--primary)}
+.stat span{font-size:.7rem;color:var(--muted)}
+.p-row{display:flex;gap:10px;align-items:center;background:#fff;padding:10px;border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+.p-row img{width:52px;height:52px;border-radius:10px;object-fit:cover}
+.p-info{flex:1}.p-info h4{font-size:.85rem}.p-info div{font-size:.72rem;color:var(--muted)}
+.sm-btn{padding:7px 12px;border:none;border-radius:9px;font-size:.75rem;font-weight:700;cursor:pointer;margin-left:4px}
+.btn-edit{background:#dfe6ff;color:#4a5fc1}.btn-del{background:#ffe3dc;color:#c0392b}
+.btn-ok{background:#d9f7ee;color:#00875a}.btn-no{background:#ffe3dc;color:#c0392b}
+.upload-row{display:flex;gap:10px;margin-bottom:14px}
+.upload-row input[type=text]{flex:1;padding:12px;border:1.5px solid #e5e5ee;border-radius:12px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox" class="login-box">
+  <div style="font-size:3rem">🔐</div>
+  <h2>Admin Tokoku</h2>
+  <input id="pwInput" type="password" placeholder="Password admin" style="width:100%;padding:12px;border:1.5px solid #e5e5ee;border-radius:12px;margin:16px 0" onkeydown="if(event.key==='Enter')adminLogin()">
+  <button class="big-btn" onclick="adminLogin()">Masuk</button>
+</div>
+
+<!-- PANEL -->
+<div id="panel" style="display:none">
+  <header><div class="hdr-top">
+    <div class="brand">⚙️ Admin Panel</div>
+    <button class="icon-btn" onclick="adminLogout()">🚪</button>
+  </div></header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('orders',this)">📦 Pesanan</div>
+    <div class="tab" onclick="switchTab('products',this)">🛍️ Produk</div>
+    <div class="tab" onclick="switchTab('settings',this)">⚙️ Setelan</div>
+  </div>
+
+  <div class="admin-main">
+    <!-- ORDERS -->
+    <div id="tab-orders">
+      <div class="stat-row">
+        <div class="stat"><b id="stBaru">0</b><span>Baru</span></div>
+        <div class="stat"><b id="stRev">Rp 0</b><span>Omzet</span></div>
+        <div class="stat"><b id="stTotal">0</b><span>Total</span></div>
+      </div>
+      <div id="orderList"></div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div id="tab-products" style="display:none">
+      <div class="upload-row">
+        <input type="text" id="upPcode" placeholder="Kode voucher baru: NAMA = nilai" disabled style="opacity:.5">
+      </div>
+      <div class="upload-row">
+        <input type="file" id="prodImg" accept="image/*">
+        <button class="sm-btn btn-ok" onclick="uploadProdImg()">⬆️ Upload Gambar</button>
+      </div>
+      <div id="upImgName" style="font-size:.75rem;color:var(--success);margin-bottom:10px"></div>
+      <div class="form" style="background:#fff;padding:16px;border-radius:14px;box-shadow:var(--shadow);margin-bottom:16px">
+        <label>Nama Produk</label><input id="pName" placeholder="Nama produk">
+        <label>Harga</label><input id="pPrice" type="number" placeholder="15000">
+        <label>Stok</label><input id="pStok" type="number" placeholder="10">
+        <label>Kategori</label><input id="pCat" placeholder="Makanan">
+        <label>Deskripsi</label><input id="pDesc" placeholder="Deskripsi singkat">
+        <button class="big-btn" onclick="addProduct()">+ Tambah Produk</button>
+      </div>
+      <div id="prodList"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings" style="display:none">
+      <div class="form" style="background:#fff;padding:16px;border-radius:14px;box-shadow:var(--shadow)">
+        <label>Nama Toko</label><input id="sName">
+        <label>Emoji Logo</label><input id="sEmoji">
+        <label>Rekening (satu per baris)</label><textarea id="sBanks" rows="3"></textarea>
+        <label>Jam CS</label><input id="sHours">
+        <button class="big-btn" onclick="saveSettings()">💾 Simpan Setelan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL='https://PROJECT-REF.supabase.co';   // GANTI
+const SB_KEY='eyJ...anon-public-key';             // GANTI
+const ADMIN_PW='admin123';                        // GANTI password admin!
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=id=>document.getElementById(id);
+const fmt=n=>'Rp '+Number(n||0).toLocaleString('id-ID');
+const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
+
+let settings=JSON.parse(localStorage.getItem('settings')||'{}');
+settings=Object.assign({storeName:'Tokoku',storeEmoji:'🛍️',banks:['BCA 1234567890 a.n. Tokoku'],csHours:'08.00–20.00'},settings);
+let upImgUrl=null;
+
+function adminLogin(){
+  if($('pwInput').value!==ADMIN_PW)return toast('❌ Password salah');
+  sessionStorage.setItem('admin','1');showPanel();
+}
+function adminLogout(){sessionStorage.removeItem('admin');location.reload()}
+function showPanel(){
+  $('loginBox').style.display='none';$('panel').style.display='block';
+  loadOrders();loadProducts();
+  $('sName').value=settings.storeName;$('sEmoji').value=settings.storeEmoji;
+  $('sBanks').value=settings.banks.join('\n');$('sHours').value=settings.csHours;
+}
+if(sessionStorage.getItem('admin'))showPanel();
+
+function switchTab(name,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  ['orders','products','settings'].forEach(t=>$('tab-'+t).style.display=t===name?'block':'none');
+  if(name==='orders')loadOrders();if(name==='products')loadProducts();
+}
+
+// ===== ORDERS =====
+async function loadOrders(){
+  const{data:orders}=await sb.from('orders').select('*').order('created_at',{ascending:false}).limit(100);
+  const list=orders||[];
+  $('stBaru').textContent=list.filter(o=>o.status==='baru').length;
+  $('stTotal').textContent=list.length;
+  $('stRev').textContent=fmt(list.filter(o=>o.status==='selesai').reduce((a,o)=>a+Number(o.total),0));
+  $('orderList').innerHTML=list.map(o=>{
+    const st={baru:['⏳ MENUNGGU','st-baru'],diproses:['🔄 DIPROSES','st-diproses'],selesai:['✅ SELESAI','st-selesai'],batal:['❌ BATAL','st-batal']}[o.status]||['?',''];
+    return`<div class="order-card">
+      <div class="oc-head"><b>${esc(o.kode)}</b><span class="oc-status ${st[1]}">${st[0]}</span></div>
+      <div style="font-size:.82rem"><b>${esc(o.uname)}</b> • ${esc(o.phone)}</div>
+      <div style="font-size:.78rem;color:#555">📍 ${esc(o.address)}</div>
+      ${o.note?`<div style="font-size:.78rem;color:var(--danger)">📝 ${esc(o.note)}</div>`:''}
+      <div class="oc-items">${(o.items||[]).map(i=>`${esc(i.name)} ×${i.qty}`).join('<br>')}</div>
+      ${o.voucher?`<div style="font-size:.75rem;color:var(--success)">Voucher ${esc(o.voucher)}: −${fmt(o.disc)}</div>`:''}
+      <div class="oc-total">${fmt(o.total)} <span style="font-size:.7rem;color:var(--muted);font-weight:400">• ${esc(o.bank||'')}</span></div>
+      ${o.lat?`<a class="ghost-btn" style="padding:8px;font-size:.8rem;margin-top:8px;display:block;text-align:center;text-decoration:none" href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank">🎯 Buka Lokasi Pembeli</a>`:''}
+      ${o.bukti?`<img src="${esc(o.bukti)}" style="width:100%;border-radius:10px;margin-top:8px" alt="bukti">`:''}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        ${o.status==='baru'?`<button class="sm-btn btn-ok" style="flex:1;padding:10px" onclick="setStatus('${o.kode}','diproses')">✔ Terima</button>
+        <button class="sm-btn btn-no" style="flex:1;padding:10px" onclick="setStatus('${o.kode}','batal')">✕ Tolak</button>`:''}
+        ${o.status==='diproses'?`<button class="sm-btn btn-ok" style="flex:1;padding:10px" onclick="setStatus('${o.kode}','selesai')">📦 Selesai</button>`:''}
+        ${o.status!=='baru'?`<button class="sm-btn btn-edit" style="flex:1;padding:10px" onclick="setStatus('${o.kode}','baru')">↩ Reset</button>`:''}
+      </div>
+      <a class="ghost-btn" style="padding:9px;font-size:.8rem;text-align:center;text-decoration:none" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent('Halo '+o.uname+', pesanan '+o.kode+' ('+fmt(o.total)+') di '+settings.storeName)}" target="_blank">💬 Chat Pembeli</a>
+    </div>`;
+  }).join('')||'<p style="text-align:center;color:var(--muted);padding:20px">Belum ada pesanan</p>';
+}
+async function setStatus(kode,status){
+  await sb.from('orders').update({status}).eq('kode',kode);
+  toast('✅ Status diperbarui');loadOrders();
+}
+
+// ===== PRODUCTS =====
+async function loadProducts(){
+  const{data}=await sb.from('products').select('*').order('created_at',{ascending:false});
+  $('prodList').innerHTML=(data||[]).map(p=>`
+    <div class="p-row">
+      <img src="${esc(p.gambar||'https://placehold.co/100x100/eee?text=%F0%9F%93%A6')}" alt="">
+      <div class="p-info"><h4>${esc(p.nama)}</h4><div>${fmt(p.harga)} • Stok ${p.stok??'∞'} • ${esc(p.kategori||'-')}</div></div>
+      <button class="sm-btn btn-edit" onclick="editStok(${p.id},${p.stok??0})">✏️ Stok</button>
+      <button class="sm-btn btn-del" onclick="delProduct(${p.id})">🗑</button>
+    </div>`).join('');
+}
+async function uploadProdImg(){
+  const f=$('prodImg').files[0];if(!f)return toast('Pilih gambar dulu');
+  try{
+    toast('⏳ Upload...');
+    const path='produk/'+Date.now()+'.jpg';
+    const{error}=await sb.storage.from('uploads').upload(path,f,{contentType:f.type});
+    if(error)throw error;
+    const{data:{publicUrl}}=sb.storage.from('uploads').getPublicUrl(path);
+    upImgUrl=publicUrl;
+    $('upImgName').textContent='✅ Gambar siap: '+f.name;
+  }catch(e){toast('❌ '+e.message)}
+}
+async function addProduct(){
+  const nama=$('pName').value.trim(),harga=Number($('pPrice').value);
+  if(!nama||!harga)return toast('Isi nama & harga');
+  const{error}=await sb.from('products').insert({
+    nama,harga,stok:Number($('pStok').value)||0,
+    kategori:$('pCat').value.trim()||'Umum',
+    deskripsi:$('pDesc').value.trim()||null,
+    gambar:upImgUrl,aktif:true});
+  if(error)return toast('❌ '+error.message);
+  ['pName','pPrice','pStok','pCat','pDesc'].forEach(i=>$(i).value='');
+  upImgUrl=null;$('upImgName').textContent='';$('prodImg').value='';
+  toast('✅ Produk ditambahkan');loadProducts();
+}
+async function editStok(id,cur){
+  const v=prompt('Stok baru:',cur);if(v===null)return;
+  await sb.from('products').update({stok:Number(v)||0}).eq('id',id);
+  toast('✅ Stok diupdate');loadProducts();
+}
+async function delProduct(id){
+  if(!confirm('Hapus produk ini?'))return;
+  await sb.from('products').update({aktif:false}).eq('id',id);
+  toast('🗑 Produk dinonaktifkan');loadProducts();
+}
+
+// ===== SETTINGS =====
+function saveSettings(){
+  settings.storeName=$('sName').value.trim()||'Tokoku';
+  settings.storeEmoji=$('sEmoji').value.trim()||'🛍️';
+  settings.banks=$('sBanks').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  settings.csHours=$('sHours').value.trim();
+  localStorage.setItem('settings',JSON.stringify(settings));
+  toast('✅ Setelan disimpan');
+}
+</script>
+</body>
+</html>
