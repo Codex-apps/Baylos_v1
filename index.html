@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tokoku — Belanja Mudah</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6c5ce7">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="hdr-top">
+    <div class="brand"><span id="storeEmoji">🛍️</span> <span id="storeName">Tokoku</span></div>
+    <div class="hdr-actions">
+      <button class="icon-btn" onclick="openOrders()">📦<span id="orderBadge" class="badge" style="display:none">0</span></button>
+      <button class="icon-btn" onclick="openCart()">🛒<span id="cartBadge" class="badge">0</span></button>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <input id="searchInput" placeholder="🔍 Cari produk..." oninput="renderProducts()">
+  </div>
+</header>
+
+<!-- KATEGORI -->
+<div id="catBar" class="cat-bar"></div>
+
+<!-- GRID PRODUK -->
+<main id="productGrid" class="grid"></main>
+<div id="emptyMsg" style="display:none;text-align:center;padding:40px;color:var(--muted)">
+  <div style="font-size:3rem"> :( </div>Produk tidak ditemukan
+</div>
+
+<!-- TOMBOL KERANJANG MELAYANG -->
+<button id="cartFab" class="cart-fab" onclick="openCart()">
+  🛒 <span id="fabTotal">Rp 0</span>
+</button>
+
+<!-- ===== MODAL: DETAIL PRODUK ===== -->
+<div id="productModal" class="modal">
+  <div class="modal-box">
+    <button class="close-btn" onclick="closeModal('productModal')">✕</button>
+    <img id="pmImg" src="" alt="">
+    <div class="pm-body">
+      <span id="pmCat" class="pill"></span>
+      <h2 id="pmName"></h2>
+      <div id="pmPrice" class="pm-price"></div>
+      <p id="pmDesc"></p>
+      <div class="qty-row">
+        <button onclick="pmQty(-1)">−</button>
+        <span id="pmQty">1</span>
+        <button onclick="pmQty(1)">+</button>
+        <button class="big-btn" style="flex:1" onclick="addToCartFromModal()">+ Keranjang</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: KERANJANG ===== -->
+<div id="cartModal" class="modal">
+  <div class="modal-box sheet">
+    <div class="sheet-handle"></div>
+    <h2>🛒 Keranjang</h2>
+    <div id="cartItems"></div>
+    <div id="cartEmpty" style="display:none;text-align:center;padding:20px;color:var(--muted)">Keranjang kosong</div>
+    <div class="cart-total"><span>Total</span><b id="cartTotal">Rp 0</b></div>
+    <button class="big-btn" onclick="goCheckout()">Checkout →</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: CHECKOUT ===== -->
+<div id="checkoutModal" class="modal">
+  <div class="modal-box sheet">
+    <div class="sheet-handle"></div>
+    <h2>📋 Checkout</h2>
+    <div class="form">
+      <label>Nama Lengkap</label>
+      <input id="coName" placeholder="Nama kamu">
+      <label>No. WhatsApp</label>
+      <input id="coPhone" type="tel" placeholder="08xxxxxxxxxx">
+      <label>Alamat Lengkap</label>
+      <textarea id="coAddress" rows="2" placeholder="Jalan, no. rumah, kelurahan..."></textarea>
+      <label>Catatan (opsional)</label>
+      <input id="coNote" placeholder="Contoh: pedas, tanpa bawang">
+      <label>Voucher (opsional)</label>
+      <input id="coVoucher" placeholder="Kode voucher" oninput="applyVoucher()">
+      <div id="voucherMsg" class="voucher-msg"></div>
+      <label>Metode Bayar</label>
+      <div id="bankList"></div>
+      <button class="ghost-btn" onclick="shareLocation()">🎯 <span id="locLabel">Kirim Lokasi (opsional)</span></button>
+      <div class="checkout-total"><span>Total Bayar</span><b id="coTotal">Rp 0</b></div>
+      <button class="big-btn" onclick="submitOrder()">Kirim Pesanan 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: BUKTI TRANSFER ===== -->
+<div id="buktiModal" class="modal">
+  <div class="modal-box sheet">
+    <div class="sheet-handle"></div>
+    <h2>📸 Upload Bukti Bayar</h2>
+    <div class="va-box" id="vaBox"></div>
+    <label>Upload foto bukti transfer</label>
+    <input type="file" id="buktiFile" accept="image/*">
+    <img id="buktiPreview" class="bukti-preview" style="display:none">
+    <button class="big-btn" onclick="submitBukti()">Kirim & Selesai ✅</button>
+    <button class="ghost-btn" onclick="closeModal('buktiModal')">Nanti saja</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: PESANAN SAYA ===== -->
+<div id="ordersModal" class="modal">
+  <div class="modal-box sheet">
+    <div class="sheet-handle"></div>
+    <h2>📦 Pesanan Saya</h2>
+    <div id="myOrders"></div>
+  </div>
+</div>
+
+<!-- ===== MODAL: SUKSES ===== -->
+<div id="successModal" class="modal">
+  <div class="modal-box" style="text-align:center;padding:32px 20px">
+    <div style="font-size:4rem">🎉</div>
+    <h2>Pesanan Terkirim!</h2>
+    <p id="successMsg"></p>
+    <button class="big-btn" onclick="closeModal('successModal');openInvoice(window._lastOrder)">🧾 Lihat Invoice</button>
+    <button class="ghost-btn" onclick="closeModal('successModal');openOrders()">📦 Lihat Pesanan Saya</button>
+    <button class="ghost-btn" onclick="closeModal('successModal')">Tutup</button>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
+<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
+</body>
+</html>
